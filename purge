@@ -1,0 +1,232 @@
+#!/usr/bin/env perl
+###############################################################################
+#
+# Created on February 3, 1999 by: Peter Peterson
+# Last Modified: August 27, 2003
+#
+# Modified by: Michael Reuter
+# Last Modified: May 5, 2006
+#
+# This a script to clean up various types of unwanted files. 
+#
+###############################################################################
+
+use FindBin qw($RealBin);
+require "$RealBin/standardize.pm";
+
+use File::Basename;
+use Getopt::Long;
+use strict;
+
+my %opt = ();
+my @filetype;
+
+###############################################################################
+# Subroutines
+###############################################################################
+
+###############################################################################
+# This subroutine performs the actual removal process. It checks against the 
+# file types being removed before removing a given file.
+###############################################################################
+
+sub clean {
+    my($base) = @_;
+    (return)unless($base);
+    #$base=standardDir($base);
+    (return)if($base =~ /\.\//);
+    ($base.='/')unless($base =~ /\/$/);
+    
+    my @dirs;
+    (print "BASE: $base\n")if($opt{debug});
+    
+    # check regular files
+    foreach(<$base*>) {
+	if(-d $_) {
+	    #$_=standardDir($_);
+	    (next)if($_ eq $base);
+	    push(@dirs, $_);
+	} else {
+	    (remove($_))if(checkDel($_));
+	}
+    }
+    
+    # check hidden files
+    foreach(<$base.*>) {
+	if(-d $_) {
+	    ($_ .= '/')unless(/\/$/);
+	    (next)if($_ eq $base);
+	    push(@dirs, $_);
+	} else {
+	    (remove($_))if(checkDel($_));
+	}
+    }
+    
+    # go through directories if we are recursing
+    if($opt{recurse} && scalar(@dirs)) {
+	foreach(@dirs) {
+	    clean($_);
+	}
+    }
+}
+
+###############################################################################
+# This subroutine checks the given file against those that have been requested 
+# to be removed.
+###############################################################################
+
+sub checkDel {
+    my($file) = @_;
+    my $length = 0;
+
+    # check against each file type
+    foreach my $type (@filetype) {
+	if($file =~ /$type/) {
+	    return 1;
+	}
+    }
+    if($file =~ /\/core\w*$/) {  # always remove core files
+	return 1;
+    } elsif($file =~ /\/jnexusdebug.dat$/) { # always remove jnexusdebug.dat
+	return 1;
+    } elsif($file =~ /\/svnmerge-commit-message.txt$/) { # and svnmerge
+        return 1;
+    } elsif($file =~ /\/deleteme$/) { # and deleteme
+        return 1;
+    } else {
+	return 0;
+    }
+}
+
+###############################################################################
+# This subroutine is where the file is actually removed.
+###############################################################################
+
+sub remove {
+    my($filename) = @_;
+    (return)if(!-e $filename);
+    unless($opt{debug}) {
+	unlink($filename) || warn "can't delete $filename: $!";
+	return;
+    }
+    (print "RM $filename\n")if($opt{debug}>1);
+}
+
+###############################################################################
+# This subroutine sets the file extensions associated with LaTex that the 
+# program will remove.
+###############################################################################
+
+sub setLatex {
+    push(@filetype,".aux\$");
+    push(@filetype,".log\$");
+}
+
+###############################################################################
+# This subroutine sets the file extensions associated with Emacs that the 
+# program will remove.
+###############################################################################
+
+sub setEmacs {
+    push(@filetype,"~\$");
+}
+
+###############################################################################
+# This subroutine sets the file extensions associated with Java that the 
+# program will remove.
+###############################################################################
+
+sub setJava {
+    push(@filetype,".class\$");
+}
+
+###############################################################################
+# This subroutine sets the file extensions associated with Python that the 
+# program will remove.
+###############################################################################
+
+sub setPython {
+    push(@filetype,".pyc\$");
+}
+
+###############################################################################
+# This subroutine prints out the help messages associated with the program 
+# command-line options.
+###############################################################################
+
+sub printHelp {
+    my $script = basename $0;
+    print "USAGE: $0 <options> <directory>\n";
+    print "This Perl script removes files according to the command line ";
+    print "switches. \n";
+    print "The default is to remove emacs backup copies inside the current ";
+    print "directory.\n";
+    print "Modifier flags:\n";
+    print "  -h | --help      : print this message\n";
+    print "  -e | --emacs     : emacs mode - remove files ending in '~' ";
+    print "<DEFAULT>\n";
+    print "  -j | --java      : java mode  - remove '.class' files\n";
+    print "  -l | --latex     : latex mode - remove '.aux' and '.log' files\n";
+    print "  -p | --python    : python mode  - remove '.pyc' files\n";
+    print "  -r | --recursive : recursively remove files\n";
+    print "  -d | --debug     : debug mode - print which files will be ";
+    print "removed but do\n                     nothing\n";
+    print "  -c | --cust      : specify custom extension to purge. Can be ";
+    print "any regular \n";
+    print "                     expression (\$ anchor will be appended if ";
+    print "missing). Don't \n";
+    print "                     forget that the command line parses strings ";
+    print "so use escape \n";
+    print "                     characters. For example, to get \'.o\\d?\' ";
+    print "into print the \n";
+    print "                     program you must type \'.o\\\\d?\'.\n";
+    
+    exit(0);
+}
+
+###############################################################################
+# Begin Main Program
+###############################################################################
+
+&GetOptions(\%opt, "cust|c=s", "debug|d+", "emacs|e", "help|h", "java|j", 
+	    "latex|l", "python|p", "recursive|r");
+
+if($opt{help}) {
+    &printHelp();
+}
+
+if($opt{emacs}) {
+    &setEmacs();
+} elsif($opt{java}) {
+    &setJava();
+} elsif($opt{latex}) {
+    &setLatex();
+} elsif($opt{python}) {
+    &setPython();
+} elsif($opt{cust}) {
+    if($opt{debug}) {
+	print "Custom option: $opt{cust}";
+    }
+    my $temp = $opt{cust}."\$";
+    push(@filetype, $temp);
+} else {
+    &setEmacs();
+}
+
+my $dir;
+if($#ARGV < 0) {
+    $dir="./";
+} else {
+    $dir = $ARGV[0];
+}
+
+# print debug information
+if($opt{debug}){
+  print "****** FILE TYPES ************\n";
+  foreach (@filetype){
+    print "$_\n";
+  }
+  print "****** FILES *****************\n";
+}
+
+&clean(standardDir($dir));
