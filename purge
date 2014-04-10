@@ -1,13 +1,7 @@
 #!/usr/bin/env perl
 ###############################################################################
 #
-# Created on February 3, 1999 by: Peter Peterson
-# Last Modified: August 27, 2003
-#
-# Modified by: Michael Reuter
-# Last Modified: May 5, 2006
-#
-# This a script to clean up various types of unwanted files. 
+# This a script to clean up various types of unwanted files.
 #
 ###############################################################################
 
@@ -85,6 +79,7 @@ sub checkDel {
 	    return 1;
 	}
     }
+
     if($file =~ /\/core\w*$/) {  # always remove core files
 	return 1;
     } elsif($file =~ /\/jnexusdebug.dat$/) { # always remove jnexusdebug.dat
@@ -189,7 +184,7 @@ sub printHelp {
 ###############################################################################
 
 &GetOptions(\%opt, "cust|c=s", "debug|d+", "emacs|e", "help|h", "java|j", 
-	    "latex|l", "python|p", "recursive|r");
+	    "latex|l", "python|p", "recurse|r");
 
 if($opt{help}) {
     &printHelp();
